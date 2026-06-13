@@ -7,24 +7,22 @@
 #include "drv/battery_drv.h"
 #include "app/app_main.h"
 
+/* 系统初始化 */
 void setup()
 {
     Board_Init();
-
     Serial.begin(115200);
     SerialSU03T.begin(9600, SERIAL_8N1, SU03T_RX_PIN, SU03T_TX_PIN);
-
     wifi_connect_start();
     setenv("TZ", "CST-8", 1);
     tzset();
-
     DHT11_Init();
     MAX30102_Init();
     GetBattery_Init();
-
     App_Init();
 }
 
+/* 主循环：FreeRTOS 已接管全部逻辑 */
 void loop()
 {
     vTaskDelay(pdMS_TO_TICKS(10));

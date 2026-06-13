@@ -7,6 +7,8 @@
 Time_Typedef Time_State;
 long long currentTime;
 
+// 苏宁 API 获取网络时间 -> Time_State
+// 获取网络时间（苏宁 API）
 void getTime()
 {
     if (WiFi.status() == WL_CONNECTED)

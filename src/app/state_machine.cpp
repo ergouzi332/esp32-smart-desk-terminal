@@ -12,7 +12,8 @@ void runStateMachine()
 {
     switch (currentState)
     {
-        case STATE_IDLE:
+                    // 空闲：WiFi 已连每 700ms 闪文字，未连每 1s 刷连接画面
+            case STATE_IDLE:
         {
             static unsigned long blinkTimer;
             static bool showText = true;
@@ -47,7 +48,8 @@ void runStateMachine()
             }
             break;
         }
-        case STATE_SHOW_TIME:
+                    // 显示时间：读取 Time_State 缓存，4 秒后回空闲
+            case STATE_SHOW_TIME:
         {
             static unsigned long start_time_time;
             if (currentState != lastState)
@@ -73,7 +75,8 @@ void runStateMachine()
             }
             break;
         }
-        case STATE_SHOW_WEATHER:
+                    // 显示天气：HTTP 获取数据，4 秒后回空闲
+            case STATE_SHOW_WEATHER:
         {
             static unsigned long start_time_weather;
             if (currentState != lastState)
@@ -99,7 +102,8 @@ void runStateMachine()
             }
             break;
         }
-        case STATE_SHOW_HR:
+                    // 心率测量：10 秒采样 MAX30102，测量完进结果状态
+            case STATE_SHOW_HR:
         {
             static unsigned long start_time_hr;
             if (currentState != lastState)
@@ -142,7 +146,8 @@ void runStateMachine()
             }
             break;
         }
-        case STATE_SHOW_HR_RESULT:
+                    // 心率结果：显示平均 BPM，2 秒后回空闲
+            case STATE_SHOW_HR_RESULT:
         {
             static unsigned long result_start_ms;
             static int displayValue;
@@ -171,7 +176,8 @@ void runStateMachine()
             }
             break;
         }
-        case STATE_SHOW_ENV:
+                    // 温湿度：显示缓存传感器数据，4 秒后回空闲
+            case STATE_SHOW_ENV:
         {
             static unsigned long start_time_dth11;
             if (currentState != lastState)
@@ -194,7 +200,8 @@ void runStateMachine()
             if (getTickMs() - start_time_dth11 >= 4000) currentState = STATE_IDLE;
             break;
         }
-        case STATE_SHOW_BATTERY:
+                    // 电量：显示缓存电池百分比，4 秒后回空闲
+            case STATE_SHOW_BATTERY:
         {
             static unsigned long start_time_battery;
             if (currentState != lastState) {

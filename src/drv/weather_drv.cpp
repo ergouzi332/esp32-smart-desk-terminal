@@ -6,6 +6,8 @@
 
 Weather_Typedef Weather_State;
 
+// 心知天气 API 获取天气 -> Weather_State
+// 获取天气数据（心知天气 API）
 void getWeather()
 {
     if (WiFi.status() == WL_CONNECTED)
