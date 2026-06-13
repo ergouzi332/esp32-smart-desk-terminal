@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include "drv/time_drv.h"
 #include <time.h>
+#include <sys/time.h>
 
 Time_Typedef Time_State;
 long long currentTime;
@@ -43,10 +44,28 @@ void getTime()
             Serial.print("HTTP request failed: ");
             Serial.println(http.errorToString(httpCode).c_str());
         }
+                struct timeval tv;
+        tv.tv_sec = currentTime / 1000;
+        tv.tv_usec = 0;
+        settimeofday(&tv, NULL);
         http.end();
     }
     else
     {
         Serial.println("WiFi not connected");
+    }
+}
+
+
+/* 从硬件 RTC 读取时间（毫秒级，替代 HTTP 刷新）*/
+void updateTimeFromRTC(void)
+{
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+        Time_State.year = timeinfo.tm_year + 1900;
+        Time_State.month = timeinfo.tm_mon + 1;
+        Time_State.day = timeinfo.tm_mday;
+        Time_State.hour = timeinfo.tm_hour;
+        Time_State.minute = timeinfo.tm_min;
     }
 }

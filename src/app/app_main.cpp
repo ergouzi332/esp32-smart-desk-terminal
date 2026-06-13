@@ -36,19 +36,17 @@ void App_Init(void)
     }, 
     "voiceTask", 4096, NULL, 3, NULL, 0);
 
-    // 传感器采集：2s 温湿度/电量，后台 30s 时间戳
+    // 传感器采集：2s 温湿度/电量
     xTaskCreatePinnedToCore([](void* p) 
     { SensorData_t sd = {0,0,0,false}; 
-    int cnt = 0; getTime(); 
+    getTime(); 
     for (;;) 
     { sd.temperature = dht11.readTemperature(); 
       sd.humidity = dht11.readHumidity(); 
       GetCur_Power(); 
       sd.batteryPercent = CurBattery; 
       sd.valid = true; 
-      xQueueOverwrite(sensorQueue, &sd); 
-      if (++cnt >= 15) 
-      { cnt = 0; getTime(); } 
+      xQueueOverwrite(sensorQueue, &sd);
       vTaskDelay(pdMS_TO_TICKS(2000)); 
     } 
     }, 

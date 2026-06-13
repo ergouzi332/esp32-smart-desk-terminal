@@ -3,6 +3,7 @@
 
 /*获取当前时间*/
 void getTime();
+void updateTimeFromRTC(void);
 
 /*时间数据结构体*/
 typedef struct 

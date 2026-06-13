@@ -58,13 +58,21 @@ void runStateMachine()
                 if (wifi_connected)
                 {
                     u8g2.clearBuffer();
-                    if (Time_State.year == 0) getTime();
+                    if (Time_State.year == 0) getTime(); // 首次 HTTP 校准 RTC
+                    updateTimeFromRTC(); // 后续走硬件 RTC
                     drawTime();
                     u8g2.sendBuffer();
-                } else
+                } else if (Time_State.year == 0)
                 {
                     u8g2.clearBuffer();
                     drawPreaseConnect();
+                    drawWifiConnecting2();
+                    u8g2.sendBuffer();
+                } else {
+                    // RTC 有数据，无 WiFi 也可显示时间
+                    updateTimeFromRTC();
+                    u8g2.clearBuffer();
+                    drawTime();
                     drawWifiConnecting2();
                     u8g2.sendBuffer();
                 }
