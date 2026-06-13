@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 #define MAX30102_I2C_ADDR 0x57   //MAX30102的I2C地址
+/*MAX30102心率血氧数据结构体*/
 typedef struct
 { int heartRate; 
     int spo2; 
