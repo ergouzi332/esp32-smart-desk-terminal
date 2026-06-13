@@ -317,7 +317,7 @@ void drawWeather()
      }
      if(strcmp(Weather_State.weatherText, "大雨") == 0)
      {
-        u8g2.drawXBMP(10, 16, 60, 48, moderate_rain);
+        u8g2.drawXBMP(10, 16, 60, 48, torrential_rain);
      }
      if(strcmp(Weather_State.weatherText, "阵雨") == 0)
      {

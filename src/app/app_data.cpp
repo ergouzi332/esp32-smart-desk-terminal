@@ -23,7 +23,7 @@ SemaphoreHandle_t sharedDataMutex = NULL;
 /*获取系统滴答时间（ms）*/
 uint32_t getTickMs(void)
 {
-    return millis();
+    return pdTICKS_TO_MS(xTaskGetTickCount());
 }
 
 /* 加锁 */

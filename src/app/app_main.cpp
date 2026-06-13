@@ -57,8 +57,10 @@ void App_Init(void)
     { uint8_t c; 
         SensorData_t nd; 
         for (;;) 
-        { if (xQueueReceive(voiceQueue, &c, 0) == pdPASS) 
-            { if (c==0xAA) currentState=STATE_SHOW_TIME; 
+        { 
+            if (xQueueReceive(voiceQueue, &c, 0) == pdPASS) 
+            { 
+                if (c==0xAA) currentState=STATE_SHOW_TIME; 
                 else if (c==0xBB) currentState=STATE_SHOW_WEATHER; 
                 else if (c==0xCC) currentState=STATE_SHOW_HR; 
                 else if (c==0xDD) currentState=STATE_SHOW_ENV; 
@@ -67,11 +69,11 @@ void App_Init(void)
             if (xQueueReceive(sensorQueue, &nd, 0) == pdPASS) 
             { 
                 setLatestSensorData(nd); 
-                SystemState prev = currentState; 
-                runStateMachine(); 
-                lastState = prev; 
-                vTaskDelay(pdMS_TO_TICKS(20)); 
             } 
+            SystemState prev = currentState; 
+            runStateMachine(); 
+            lastState = prev; 
+            vTaskDelay(pdMS_TO_TICKS(20)); 
         } 
     }, "stateMachineTask", 8192, NULL, 2, NULL, 1);
 }

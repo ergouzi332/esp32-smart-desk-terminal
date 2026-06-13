@@ -12,7 +12,7 @@ void runStateMachine()
 {
     switch (currentState)
     {
-                    // 空闲：WiFi 已连每 700ms 闪文字，未连每 1s 刷连接画面
+                    // 空闲：WiFi 已连接700ms闪烁文字，未连每1s刷连接画面
             case STATE_IDLE:
         {
             static unsigned long blinkTimer;
