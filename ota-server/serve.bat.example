@@ -1,0 +1,27 @@
+@echo off                  :: 关闭命令行命令回显
+echo ===== Smart Desk OTA Server =====
+echo.
+set SRC=C:\Users\86195\Desktop\esp32code\smart-desk-terminal\.pio\build\esp32-s3-devkitc-1\firmware.bin  :: 定义ESP32编译固件源文件路径
+copy /Y "%SRC%" "%~dp0firmware.bin" >nul  :: 复制固件到脚本同级目录，自动覆盖、屏蔽输出
+if %errorlevel% equ 0 (  :: 判断文件复制是否成功
+    echo [OK] firmware.bin ???
+) else (
+    echo [FAIL] ??? firmware.bin?????
+    pause                 :: 暂停窗口
+    exit /b               :: 退出批处理
+)
+
+set /p VER=<"%~dp0version.txt"  :: 读取版本号文件内容
+echo [OK] ???: %VER%
+
+cd /d "%~dp0"  :: 切换当前目录为脚本所在目录
+echo.
+echo ===== ???: http://localhost:8080 =====
+echo  ? version.txt ?????? OTA ??
+echo  Ctrl+C ??
+echo.
+python -m http.server 8080 --bind 0.0.0.0  :: 启动Python简易HTTP服务，监听8080端口、允许外网访问
+if %errorlevel% neq 0 (  :: 判断HTTP服务是否启动失败
+    echo [FAIL] Python ????
+)
+pause  :: 暂停窗口，防止运行完毕直接关闭

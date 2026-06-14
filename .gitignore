@@ -2,3 +2,5 @@
 .vscode/
 test/
 include/config.h
+include/app/ota.h
+ota-server/serve.bat
