@@ -6,6 +6,7 @@
 #include "drv/dht11_drv.h"
 #include "drv/battery_drv.h"
 #include "drv/time_drv.h"
+#include "app/ota.h"
 
 /* 应用初始化：创建 FreeRTOS 任务与 IPC 对象 */
 void App_Init(void)
@@ -76,4 +77,6 @@ void App_Init(void)
             vTaskDelay(pdMS_TO_TICKS(20)); 
         } 
     }, "stateMachineTask", 8192, NULL, 2, NULL, 1);
+
+    ota_start_task();
 }
