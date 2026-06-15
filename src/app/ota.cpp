@@ -1,30 +1,24 @@
 #include "app/ota.h"
+#include "app/ota_sha256.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <Update.h>
-#include <nvs_flash.h>
-#include <nvs.h>
+#include <Preferences.h>
 
 static String read_local_version() {
-    nvs_handle_t h;
-    char buf[16];
-    size_t len = sizeof(buf);
-    if (nvs_open("ota", NVS_READONLY, &h) == ESP_OK) {
-        esp_err_t e = nvs_get_str(h, "version", buf, &len);
-        nvs_close(h);
-        if (e == ESP_OK) return String(buf);
-    }
-    return String(OTA_DEFAULT_VERSION);
+    Preferences p;
+    p.begin("ota", true);
+    String v = p.getString("version", OTA_DEFAULT_VERSION);
+    p.end();
+    return v;
 }
 
 static void save_local_version(const String &v) {
-    nvs_handle_t h;
-    if (nvs_open("ota", NVS_READWRITE, &h) == ESP_OK) {
-        nvs_set_str(h, "version", v.c_str());
-        nvs_commit(h);
-        nvs_close(h);
-    }
+    Preferences p;
+    p.begin("ota", false);
+    p.putString("version", v);
+    p.end();
 }
 
 static void ota_task(void* param) {
@@ -54,24 +48,65 @@ static void ota_task(void* param) {
             Serial.print(" -> 服务器："); Serial.println(server_ver);
 
             if (local_ver == server_ver) {
-                Serial.println("[OTA] 已是最新");
+                Serial.println("[OTA] 已是最新版本，无需升级");
             } else if (server_ver.length() == 0) {
-                Serial.println("[OTA] 服务器返回空");
+                Serial.println("[OTA] 服务器返回空版本号");
             } else {
                 Serial.println("[OTA] 发现新版本！开始下载...");
+
+                http.begin(url + "firmware.sha256");
+                http.setTimeout(5000);
+                int shaCode = http.GET();
+                String expected_hash;
+                if (shaCode == 200) {
+                    expected_hash = http.getString(); expected_hash.trim(); expected_hash.toLowerCase();
+                }
+                http.end();
+
                 http.begin(url + "firmware.bin");
                 http.setTimeout(10000);
                 int fwCode = http.GET();
                 if (fwCode == 200) {
                     int total = http.getSize();
                     if (total > 0 && Update.begin(total)) {
-                        size_t w = Update.writeStream(http.getStream());
-                        if (w == total && Update.end()) {
-                            save_local_version(server_ver);
-                            Serial.println("[OTA] 升级成功！重启中...");
-                            delay(100); esp_restart();
+                        ota_sha256_ctx sha;
+                        ota_sha256_init(&sha);
+                        uint8_t buf[128];
+                        WiFiClient *s = http.getStreamPtr();
+                        size_t written = 0;
+                        while (http.connected() && written < (size_t)total) {
+                            size_t avail = s->available();
+                            if (avail > 0) {
+                                if (avail > sizeof(buf)) avail = sizeof(buf);
+                                int r2 = s->readBytes(buf, avail);
+                                if (r2 > 0) {
+                                    Update.write(buf, r2);
+                                    ota_sha256_update(&sha, buf, r2);
+                                    written += r2;
+                                }
+                            }
+                        }
+                        uint8_t hash[32];
+                        ota_sha256_final(&sha, hash);
+                        String hex_hash;
+                        for (int i = 0; i < 32; i++) {
+                            if (hash[i] < 16) hex_hash += "0";
+                            hex_hash += String(hash[i], HEX);
+                        }
+                        hex_hash.toLowerCase();
+                        Serial.print("[OTA] SHA256: "); Serial.println(hex_hash);
+
+                        if (expected_hash.length() == 0 || hex_hash == expected_hash) {
+                            if (Update.end()) {
+                                save_local_version(server_ver);
+                                Serial.println("[OTA] 升级成功！重启中...");
+                                delay(100); esp_restart();
+                            } else {
+                                Serial.print("[OTA] 失败："); Serial.println(Update.errorString());
+                            }
                         } else {
-                            Serial.print("[OTA] 失败："); Serial.println(Update.errorString());
+                            Serial.println("[OTA] SHA256 不匹配！取消升级");
+                            Update.abort();
                         }
                     }
                 }
