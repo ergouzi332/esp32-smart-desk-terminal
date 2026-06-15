@@ -6,6 +6,7 @@
 #include "drv/max30102_drv.h"
 #include "drv/battery_drv.h"
 #include "app/app_main.h"
+ #include "drv/self_test.h"
 
 /* 系统初始化 */
 void setup()
@@ -19,6 +20,11 @@ void setup()
     DHT11_Init();
     MAX30102_Init();
     GetBattery_Init();
+ 
+     /* 开机自检 */
+     SelfTest_RunAll();
+     SelfTest_ShowScreen();
+ 
     App_Init();
 }
 

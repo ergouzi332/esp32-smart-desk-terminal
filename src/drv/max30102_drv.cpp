@@ -157,6 +157,10 @@ void MAX30102_Init(void)
 		delay(500);
 	}
 }
+ 
+ bool max30102_is_ready(void) {
+     return MAX30102_Ready;
+ }
 
 // 心跳检测算法
 static bool detectBeat(long value)

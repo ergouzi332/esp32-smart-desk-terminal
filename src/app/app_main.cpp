@@ -1,4 +1,4 @@
-#include "app/app_main.h"
+﻿#include "app/app_main.h"
 #include "app/app_data.h"
 #include "app/state_machine.h"
 #include "bsp/board.h"
@@ -7,16 +7,43 @@
 #include "drv/battery_drv.h"
 #include "drv/time_drv.h"
 #include "app/ota.h"
+#include <Preferences.h>
+#include <esp_ota_ops.h>
 
-/* 应用初始化：创建 FreeRTOS 任务与 IPC 对象 */
+#define OTA_MAX_BOOT_ATTEMPTS 4
+
 void App_Init(void)
 {
+    /* === OTA 回滚检测：先于一切执行，检测崩溃循环 === */
+    {
+        Preferences pref;
+        pref.begin("ota", false);
+        bool pending = pref.getBool("pending", false);
+        if (pending) {
+            uint8_t attempt = pref.getUChar("attempt", 0) + 1;
+            pref.putUChar("attempt", attempt);
+            pref.end();
+            Serial.printf("[OTA] 启动尝试 %d/%d\n", attempt, OTA_MAX_BOOT_ATTEMPTS);
+            if (attempt >= OTA_MAX_BOOT_ATTEMPTS) {
+                const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
+                if (part) {
+                    esp_ota_set_boot_partition(part);
+                    Serial.println("[OTA] 启动失败次数过多，回滚到旧分区");
+                    delay(100);
+                    esp_restart();
+                }
+            }
+        } else {
+            pref.end();
+        }
+    }
+
     sharedDataMutex = xSemaphoreCreateMutex();
     if (sharedDataMutex == NULL) { while (1) { } }
     voiceQueue = xQueueCreate(8, sizeof(uint8_t));
     sensorQueue = xQueueCreate(1, sizeof(SensorData_t));
 
-    // WiFi 状态检测：500ms
+    /* WiFi 状态检测：500ms */
     xTaskCreatePinnedToCore([](void* p) 
     { for (;;) 
         { wifi_task_loop(); 
@@ -25,7 +52,7 @@ void App_Init(void)
     }, 
     "wifiTask", 4096, NULL, 1, NULL, 1);
 
-    // 语音监听：串口读取 SU-03T 指令
+    /* 语音监听：串口读取 SU-03T 指令 */
     xTaskCreatePinnedToCore([](void* p) 
     { for (;;) 
         { if (Serial.available()) 
@@ -37,7 +64,7 @@ void App_Init(void)
     }, 
     "voiceTask", 4096, NULL, 3, NULL, 0);
 
-    // 传感器采集：2s 温湿度/电量
+    /* 传感器采集：2s 温湿度/电量 */
     xTaskCreatePinnedToCore([](void* p) 
     { SensorData_t sd = {0,0,0,false}; 
     getTime(); 
@@ -53,7 +80,7 @@ void App_Init(void)
     }, 
     "sensorTask", 4096, NULL, 2, NULL, 0);
 
-    // 状态机：核心编排，20ms 循环
+    /* 状态机：核心编排，20ms 循环 */
     xTaskCreatePinnedToCore([](void* p) 
     { uint8_t c; 
         SensorData_t nd; 
@@ -79,4 +106,18 @@ void App_Init(void)
     }, "stateMachineTask", 8192, NULL, 2, NULL, 1);
 
     ota_start_task();
+
+    /* == OTA 健康检查：稳定运行 30 秒后确认新固件 == */
+    xTaskCreatePinnedToCore([](void*) {
+        vTaskDelay(pdMS_TO_TICKS(30000));
+        Preferences p;
+        p.begin("ota", false);
+        if (p.getBool("pending", false)) {
+            p.putBool("pending", false);
+            p.remove("attempt");
+            Serial.println("[OTA] 新固件已验证通过，取消回滚");
+        }
+        p.end();
+        vTaskDelete(NULL);
+    }, "otaHealthTask", 2048, NULL, 1, NULL, 1);
 }

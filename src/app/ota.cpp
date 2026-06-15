@@ -76,6 +76,15 @@ static void ota_task(void* param) {
             Serial.println("[OTA] 服务器版本为空");
         } else {
             Serial.println("[OTA] 发现新版本！开始下载...");
+ 
+            /* 清除旧的回滚标记：避免本次升级失败后残留旧 pending 导致误回滚 */
+            {
+                Preferences p;
+                p.begin("ota", false);
+                p.remove("pending");
+                p.remove("attempt");
+                p.end();
+            }
 
             /* 2. 获取 SHA256 校验值 */
             http.begin(base + "firmware.sha256");
@@ -166,6 +175,14 @@ static void ota_task(void* param) {
 
                     if (expected_hash.length() == 0 || hex_hash == expected_hash) {
                         if (Update.end()) {
+                            /* 设置 OTA 回滚验证标志：下次启动先进入验证期 */
+                            {
+                                Preferences p;
+                                p.begin("ota", false);
+                                p.putBool("pending", true);
+                                p.putUChar("attempt", 0);
+                                p.end();
+                            }
                             save_local_version(server_ver);
                             Serial.println("[OTA] 升级成功！重启中...");
                             delay(100);
