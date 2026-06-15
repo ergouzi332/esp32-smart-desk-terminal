@@ -4,5 +4,7 @@ test/
 include/config.h
 include/app/ota.h
 ota-server/serve.bat
+ota-server/firmware.bin
 
 ota-server/firmware.sha256
+ota-server/firmware.enc
