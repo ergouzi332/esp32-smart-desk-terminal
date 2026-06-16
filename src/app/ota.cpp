@@ -7,44 +7,45 @@
 #include <Update.h>
 #include <Preferences.h>
 
+/*读取本地存储的固件版本号*/
 static String read_local_version() {
     Preferences p;
     p.begin("ota", true);
-    String v = p.getString("version", OTA_DEFAULT_VERSION);
+    String v = p.getString("version", OTA_DEFAULT_VERSION);//若键不存在/读取失败，返回兜底默认版本OTA_DEFAULT_VERSION
     p.end();
     return v;
 }
-
+/*将新版本号写入NVS持久化存储*/
 static void save_local_version(const String &v) {
     Preferences p;
     p.begin("ota", false);
     p.putString("version", v);
     p.end();
 }
-
-/* Flash 写回调 */
+/*Flash写回调*/
 static size_t g_ota_written = 0;
 static void ota_write_cb(uint8_t *data, size_t len) {
     if (len > 0) {
-        Update.write(data, len);
+        Update.write(data, len);//将分片固件数据写入Flash完成OTA烧录
         g_ota_written += len;
     }
 }
-
-/* SHA256 哈希回调 */
+/*SHA256 哈希回调*/
 static ota_sha256_ctx g_sha_ctx;
 static void ota_sha_cb(const uint8_t *data, size_t len) {
     if (len > 0) {
-        ota_sha256_update(&g_sha_ctx, data, len);
+        ota_sha256_update(&g_sha_ctx, data, len);//分段更新SHA256上下文，累加计算哈希值
     }
 }
 
 static void ota_task(void* param) {
     for (;;) {
         int r = 0;
+        /*循环等待WiFi连接，最大重试100次，每次间隔100ms*/
         while (WiFi.status() != WL_CONNECTED && r < 100) {
             vTaskDelay(pdMS_TO_TICKS(100)); r++;
         }
+        /*超时仍未连接WiFi，打印提示并延时30秒后进入下一轮循环*/
         if (WiFi.status() != WL_CONNECTED) {
             Serial.println("[OTA] WiFi 未连接");
             vTaskDelay(pdMS_TO_TICKS(30000)); continue;

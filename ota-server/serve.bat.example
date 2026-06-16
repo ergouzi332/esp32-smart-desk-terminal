@@ -1,27 +1,49 @@
-@echo off                  :: 关闭命令行命令回显
+@echo off
+:: 设置控制台编码为UTF-8，避免中文乱码，屏蔽命令执行输出
+chcp 65001 >nul
+:: 打印服务标题
 echo ===== Smart Desk OTA Server =====
 echo.
-set SRC=C:\Users\86195\Desktop\esp32code\smart-desk-terminal\.pio\build\esp32-s3-devkitc-1\firmware.bin  :: 定义ESP32编译固件源文件路径
-copy /Y "%SRC%" "%~dp0firmware.bin" >nul  :: 复制固件到脚本同级目录，自动覆盖、屏蔽输出
-if %errorlevel% equ 0 (  :: 判断文件复制是否成功
-    echo [OK] firmware.bin ???
+
+:: 定义待升级的原始固件bin文件路径
+set SRC=C:\Users\86195\Desktop\esp32code\smart-desk-terminal\.pio\build\esp32-s3-devkitc-1\firmware.bin
+:: 将编译好的固件复制到当前脚本同级目录，/Y 静默覆盖已有文件
+copy /Y "%SRC%" "%~dp0firmware.bin" >nul
+:: 判断文件复制执行结果
+if %errorlevel% equ 0 (
+    echo [OK] firmware.bin copied
 ) else (
-    echo [FAIL] ??? firmware.bin?????
-    pause                 :: 暂停窗口
-    exit /b               :: 退出批处理
+    echo [FAIL] failed to copy firmware.bin
+    pause
+    exit /b
 )
 
-set /p VER=<"%~dp0version.txt"  :: 读取版本号文件内容
-echo [OK] ???: %VER%
-
-cd /d "%~dp0"  :: 切换当前目录为脚本所在目录
-echo.
-echo ===== ???: http://localhost:8080 =====
-echo  ? version.txt ?????? OTA ??
-echo  Ctrl+C ??
-echo.
-python -m http.server 8080 --bind 0.0.0.0  :: 启动Python简易HTTP服务，监听8080端口、允许外网访问
-if %errorlevel% neq 0 (  :: 判断HTTP服务是否启动失败
-    echo [FAIL] Python ????
+echo [INFO] Encrypting firmware...
+:: 切换工作目录至当前bat脚本所在目录
+cd /d "%~dp0"
+:: 调用Python脚本对固件进行加密处理
+python encrypt_firmware.py
+:: 加密脚本执行失败判断（通常为缺少pycryptodome依赖）
+if %errorlevel% neq 0 (
+    echo [FAIL] need: pip install pycryptodome
+    pause
+    exit /b
 )
-pause  :: 暂停窗口，防止运行完毕直接关闭
+
+:: 读取版本号文件中的版本信息
+set /p VER=<"%~dp0version.txt"
+echo [OK] version: %VER%
+
+echo.
+:: 启动本地HTTP文件服务器，作为OTA升级服务端
+echo ===== Server: http://localhost:8080 =====
+echo  Update version.txt to trigger OTA
+echo  Press Ctrl+C to stop
+echo.
+:: 监听8080端口，绑定0.0.0.0允许局域网内设备访问
+python -m http.server 8080 --bind 0.0.0.0
+:: 判断HTTP服务启动状态
+if %errorlevel% neq 0 (
+    echo [FAIL] Python HTTP server failed
+)
+pause
