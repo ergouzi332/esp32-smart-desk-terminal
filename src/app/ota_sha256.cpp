@@ -1,9 +1,7 @@
 #include "app/ota_sha256.h"
 #include <string.h>
 
-/* SHA256算法64轮常量K
- * 算法标准固定值，由自然数立方根小数部分取前32位生成
- * 每一轮压缩运算都会使用对应下标常量*/
+/*SHA256算法64轮常量K*/
 static const uint32_t K[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
     0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,

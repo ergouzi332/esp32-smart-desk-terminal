@@ -50,13 +50,13 @@ static void ota_task(void* param) {
             Serial.println("[OTA] WiFi 未连接");
             vTaskDelay(pdMS_TO_TICKS(30000)); continue;
         }
-
+        /*拼接出OTA服务器的版本检测地址*/
         String base = "http://" + String(OTA_SERVER_IP) + ":" + String(OTA_SERVER_PORT) + "/";
         Serial.print("[OTA] 检查更新："); Serial.println(base + "version.txt");
 
         HTTPClient http;
 
-        /* 1. 获取版本号 */
+        /*================获取版本号==================*/
         http.begin(base + "version.txt");
         http.setTimeout(5000);
         int code = http.GET();
@@ -70,7 +70,7 @@ static void ota_task(void* param) {
         String local_ver = read_local_version();
         Serial.print("[OTA] 本地："); Serial.print(local_ver);
         Serial.print(" -> 服务器："); Serial.println(server_ver);
-
+        /*================版本不同，进入OTA==================*/
         if (local_ver == server_ver) {
             Serial.println("[OTA] 已是最新版本，无需升级");
         } else if (server_ver.length() == 0) {
@@ -78,16 +78,7 @@ static void ota_task(void* param) {
         } else {
             Serial.println("[OTA] 发现新版本！开始下载...");
  
-            /* 清除旧的回滚标记：避免本次升级失败后残留旧 pending 导致误回滚 */
-            {
-                Preferences p;
-                p.begin("ota", false);
-                p.remove("pending");
-                p.remove("attempt");
-                p.end();
-            }
-
-            /* 2. 获取 SHA256 校验值 */
+            /*==============OTA：获取SHA256校验值=================*/
             http.begin(base + "firmware.sha256");
             http.setTimeout(5000);
             String expected_hash;
@@ -95,8 +86,7 @@ static void ota_task(void* param) {
                 expected_hash = http.getString(); expected_hash.trim(); expected_hash.toLowerCase();
             }
             http.end();
-
-            /* 3. 下载加密固件 firmware.enc */
+            /*==============OTA：下载加密固件firmware.enc=================*/
             http.begin(base + "firmware.enc");
             http.setTimeout(10000);
             int fwCode = http.GET();
@@ -118,8 +108,7 @@ static void ota_task(void* param) {
                 http.end();
                 vTaskDelay(pdMS_TO_TICKS(10000)); continue;
             }
-
-            /* 4. 初始化 AES 流式解密和 SHA256 */
+            /*==============OTA：初始化AES流式解密和SHA256=================*/
             ota_aes_stream_ctx_t aes_ctx;
             const uint8_t *key = ota_aes_get_key();
             const uint8_t *iv  = ota_aes_get_iv();
@@ -127,8 +116,7 @@ static void ota_task(void* param) {
 
             ota_sha256_init(&g_sha_ctx);
             g_ota_written = 0;
-
-            /* 5. 流式读取、解密 */
+            /*==============OTA：流式读取、解密=================*/
             uint8_t buf[128];
             WiFiClient *s = http.getStreamPtr();
             size_t total_read = 0;
@@ -154,16 +142,15 @@ static void ota_task(void* param) {
                     total_read += (n - aligned);
                 }
             }
-
+            /*==============OTA：处理最后一块PKCS7填充=================*/
             if (total_read == (size_t)total) {
-                /* 6. 处理最后一块 PKCS7 填充 */
                 size_t last_len;
                 if (ota_aes_stream_finish(&aes_ctx, &last_len,
                                           ota_write_cb, ota_sha_cb) != 0) {
                     Serial.println("[OTA] AES 收尾错误");
                     Update.abort();
                 } else {
-                    /* 7. 计算 SHA256 并校验 */
+                    /*==============OTA：计算 SHA256 并校验=================*/
                     uint8_t hash[32];
                     ota_sha256_final(&g_sha_ctx, hash);
                     String hex_hash;
