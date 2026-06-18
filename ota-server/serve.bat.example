@@ -1,48 +1,51 @@
 @echo off
-:: 设置控制台编码为UTF-8，避免中文乱码，屏蔽命令执行输出
+:: 关闭命令行默认回显，只输出自定义打印内容
 chcp 65001 >nul
-:: 打印服务标题
+:: 设置控制台编码为UTF-8，解决中文乱码问题，屏蔽编码切换输出信息
 echo ===== Smart Desk OTA Server =====
 echo.
 
-:: 定义待升级的原始固件bin文件路径
+:: 定义源固件路径：PlatformIO编译生成的ESP32-S3固件bin文件
 set SRC=C:\Users\86195\Desktop\esp32code\smart-desk-terminal\.pio\build\esp32-s3-devkitc-1\firmware.bin
-:: 将编译好的固件复制到当前脚本同级目录，/Y 静默覆盖已有文件
+:: 强制复制编译好的明文固件到脚本同目录，屏蔽复制成功/失败默认输出
 copy /Y "%SRC%" "%~dp0firmware.bin" >nul
-:: 判断文件复制执行结果
+:: 判断上一条复制命令执行结果
 if %errorlevel% equ 0 (
     echo [OK] firmware.bin copied
 ) else (
     echo [FAIL] failed to copy firmware.bin
     pause
-    exit /b
+    exit /b :: 复制失败，暂停窗口并退出批处理
 )
 
 echo [INFO] Encrypting firmware...
-:: 切换工作目录至当前bat脚本所在目录
+:: 切换工作目录到当前bat脚本所在文件夹
 cd /d "%~dp0"
-:: 调用Python脚本对固件进行加密处理
+:: 执行Python固件加密脚本，对明文固件做加密处理
 python encrypt_firmware.py
-:: 加密脚本执行失败判断（通常为缺少pycryptodome依赖）
+:: 加密脚本执行失败处理
 if %errorlevel% neq 0 (
     echo [FAIL] need: pip install pycryptodome
     pause
     exit /b
 )
 
-:: 读取版本号文件中的版本信息
+:: 删除本地临时明文固件，只保留加密后的固件文件
+del "%~dp0firmware.bin"
+echo [OK] deleted plaintext firmware.bin
+
+:: 读取version.txt内的版本号，存入VER变量
 set /p VER=<"%~dp0version.txt"
 echo [OK] version: %VER%
 
 echo.
-:: 启动本地HTTP文件服务器，作为OTA升级服务端
 echo ===== Server: http://localhost:8080 =====
 echo  Update version.txt to trigger OTA
 echo  Press Ctrl+C to stop
 echo.
-:: 监听8080端口，绑定0.0.0.0允许局域网内设备访问
+:: 启动Python内置简易HTTP文件服务器，监听本机所有网卡0.0.0.0，端口8080
 python -m http.server 8080 --bind 0.0.0.0
-:: 判断HTTP服务启动状态
+:: 判断HTTP服务器启动异常
 if %errorlevel% neq 0 (
     echo [FAIL] Python HTTP server failed
 )

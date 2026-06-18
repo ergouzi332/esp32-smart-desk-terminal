@@ -89,8 +89,8 @@ void App_Init(void)
     /* 语音监听任务：绑定核心0，10ms读取串口SU-03T语音指令存入队列 */
     xTaskCreatePinnedToCore([](void* p) 
     { for (;;) 
-        { if (Serial.available()) 
-            { uint8_t c = Serial.read(); 
+        { if (SerialSU03T.available()) 
+            { uint8_t c = SerialSU03T.read(); 
                 xQueueSend(voiceQueue, &c, 0); // 非阻塞发送指令到队列
             } 
             vTaskDelay(pdMS_TO_TICKS(10)); 
