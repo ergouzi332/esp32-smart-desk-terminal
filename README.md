@@ -106,7 +106,7 @@ smart-desk-terminal/
 ### 安全 OTA 流程
 
 ```
-USB 烧录 → 本地运行 serve.bat 启动 OTA 服务器
+USB 烧录 → 本地运行 serve.bat 启动 OTA 服务器[后续可扩展为基于IoT平台服务器]
         → 设备检测新版本（HTTP version.txt）
         → 下载 firmware.enc（AES-128-CBC 加密固件）
         → pending-block 流式解密 + SHA256 实时校验
