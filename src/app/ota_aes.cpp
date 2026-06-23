@@ -1,8 +1,8 @@
-#include "app/ota_aes.h"
+﻿#include "app/ota_aes.h"
 #include "app/ota.h"
 #include <string.h>
 
-/* ==================== S-Box 与逆 S-Box ==================== */
+/* ==================== S-Box 涓庨€?S-Box ==================== */
 
 static const uint8_t sbox[256] = {
     0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
@@ -42,12 +42,12 @@ static const uint8_t inv_sbox[256] = {
     0x17,0x2b,0x04,0x7e,0xba,0x77,0xd6,0x26,0xe1,0x69,0x14,0x63,0x55,0x21,0x0c,0x7d
 };
 
-/* RCON 轮常数，索引对应轮数 */
+/* RCON 杞父鏁帮紝绱㈠紩瀵瑰簲杞暟 */
 static const uint8_t rcon[11] = {
     0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36
 };
 
-/* ==================== GF(2^8) 乘法（用于 InvMixColumns） ==================== */
+/* ==================== GF(2^8) 涔樻硶锛堢敤浜?InvMixColumns锛?==================== */
 
 static uint8_t gf_mul2(uint8_t a) {
     return (a & 0x80) ? ((a << 1) ^ 0x1b) : (a << 1);
@@ -59,9 +59,9 @@ static uint8_t gf_mul11(uint8_t a) { return gf_mul8(a) ^ gf_mul2(a) ^ a; }
 static uint8_t gf_mul13(uint8_t a) { return gf_mul8(a) ^ gf_mul4(a) ^ a; }
 static uint8_t gf_mul14(uint8_t a) { return gf_mul8(a) ^ gf_mul4(a) ^ gf_mul2(a); }
 
-/* ==================== 密钥扩展 ==================== */
+/* ==================== 瀵嗛挜鎵╁睍 ==================== */
 
-/* 加载 4 字节为大端 uint32 */
+/* 鍔犺浇 4 瀛楄妭涓哄ぇ绔?uint32 */
 static uint32_t load32be(const uint8_t *p) {
     return ((uint32_t)p[0] << 24) |
            ((uint32_t)p[1] << 16) |
@@ -69,7 +69,7 @@ static uint32_t load32be(const uint8_t *p) {
            (uint32_t)p[3];
 }
 
-/* 保存 uint32 为大端 4 字节 */
+/* 淇濆瓨 uint32 涓哄ぇ绔?4 瀛楄妭 */
 static void store32be(uint8_t *p, uint32_t v) {
     p[0] = (uint8_t)(v >> 24);
     p[1] = (uint8_t)(v >> 16);
@@ -77,12 +77,12 @@ static void store32be(uint8_t *p, uint32_t v) {
     p[3] = (uint8_t)(v);
 }
 
-/* RotWord: 4 字节循环左移 1 位 */
+/* RotWord: 4 瀛楄妭寰幆宸︾Щ 1 浣?*/
 static uint32_t rot_word(uint32_t w) {
     return (w << 8) | (w >> 24);
 }
 
-/* SubWord: 对每个字节应用 S-box */
+/* SubWord: 瀵规瘡涓瓧鑺傚簲鐢?S-box */
 static uint32_t sub_word(uint32_t w) {
     uint8_t b0 = sbox[(w >> 24) & 0xff];
     uint8_t b1 = sbox[(w >> 16) & 0xff];
@@ -93,9 +93,8 @@ static uint32_t sub_word(uint32_t w) {
 }
 
 /*
- * 将 16 字节密钥扩展为 44 字的轮密钥数组 rk[44]
- * AES-128 需要 11 轮密钥（44 字 = 176 字节）
- */
+ * 灏?16 瀛楄妭瀵嗛挜鎵╁睍涓?44 瀛楃殑杞瘑閽ユ暟缁?rk[44]
+ * AES-128 闇€瑕?11 杞瘑閽ワ紙44 瀛?= 176 瀛楄妭锛? */
 static void key_expansion(const uint8_t key[16], uint32_t rk[44]) {
     for (int i = 0; i < 4; i++) {
         rk[i] = load32be(key + i * 4);
@@ -109,32 +108,32 @@ static void key_expansion(const uint8_t key[16], uint32_t rk[44]) {
     }
 }
 
-/* ==================== AES-128 单块解密 ==================== */
+/* ==================== AES-128 鍗曞潡瑙ｅ瘑 ==================== */
 
 /*
- * 解密一个 16 字节块，使用标准 AES 逆算法：
+ * 瑙ｅ瘑涓€涓?16 瀛楄妭鍧楋紝浣跨敤鏍囧噯 AES 閫嗙畻娉曪細
  *   AddRoundKey(rk[10])
  *   for round = 9..1:
- *       InvShiftRows → InvSubBytes → AddRoundKey(rk[round]) → InvMixColumns
- *   InvShiftRows → InvSubBytes → AddRoundKey(rk[0])
+ *       InvShiftRows 鈫?InvSubBytes 鈫?AddRoundKey(rk[round]) 鈫?InvMixColumns
+ *   InvShiftRows 鈫?InvSubBytes 鈫?AddRoundKey(rk[0])
  *
- * 状态矩阵按列优先排列：s[r][c] = block[4*c + r]
- * 轮密钥 rk[round + c] 的第 r 字节 = 字节 (round + c) 字的 (3-r) 字节位置
+ * 鐘舵€佺煩闃垫寜鍒椾紭鍏堟帓鍒楋細s[r][c] = block[4*c + r]
+ * 杞瘑閽?rk[round * 4 + c] 鐨勭 r 瀛楄妭 = 瀛楄妭 (round + c) 瀛楃殑 (3-r) 瀛楄妭浣嶇疆
  */
 static void aes_decrypt_block(uint8_t block[16], const uint32_t rk[44]) {
-    uint8_t s[4][4]; /* 行 r，列 c */
+    uint8_t s[4][4]; /* 琛?r锛屽垪 c */
     for (int r = 0; r < 4; r++)
         for (int c = 0; c < 4; c++)
             s[r][c] = block[r + 4 * c];
 
-    /* 第 10 轮：仅 AddRoundKey */
+    /* 绗?10 杞細浠?AddRoundKey */
     for (int r = 0; r < 4; r++)
         for (int c = 0; c < 4; c++)
-            s[r][c] ^= (uint8_t)(rk[10 + c] >> (24 - r * 8));
+            s[r][c] ^= (uint8_t)(rk[40 + c] >> (24 - r * 8));
 
-    /* 第 9 轮 ~ 第 1 轮 */
+    /* 绗?9 杞?~ 绗?1 杞?*/
     for (int round = 9; round >= 1; round--) {
-        /* InvShiftRows：行 0 不变，行 1~3 右移 */
+        /* InvShiftRows锛氳 0 涓嶅彉锛岃 1~3 鍙崇Щ */
         { uint8_t t = s[1][3]; s[1][3] = s[1][2]; s[1][2] = s[1][1]; s[1][1] = s[1][0]; s[1][0] = t; }
         { uint8_t t0 = s[2][0], t1 = s[2][1]; s[2][0] = s[2][2]; s[2][2] = t0; s[2][1] = s[2][3]; s[2][3] = t1; }
         { uint8_t t = s[3][0]; s[3][0] = s[3][1]; s[3][1] = s[3][2]; s[3][2] = s[3][3]; s[3][3] = t; }
@@ -147,7 +146,7 @@ static void aes_decrypt_block(uint8_t block[16], const uint32_t rk[44]) {
         /* AddRoundKey */
         for (int r = 0; r < 4; r++)
             for (int c = 0; c < 4; c++)
-                s[r][c] ^= (uint8_t)(rk[round + c] >> (24 - r * 8));
+                s[r][c] ^= (uint8_t)(rk[round * 4 + c] >> (24 - r * 8));
 
         /* InvMixColumns */
         for (int c = 0; c < 4; c++) {
@@ -159,7 +158,7 @@ static void aes_decrypt_block(uint8_t block[16], const uint32_t rk[44]) {
         }
     }
 
-    /* 第 0 轮：InvShiftRows → InvSubBytes → AddRoundKey */
+    /* 绗?0 杞細InvShiftRows 鈫?InvSubBytes 鈫?AddRoundKey */
     { uint8_t t = s[1][3]; s[1][3] = s[1][2]; s[1][2] = s[1][1]; s[1][1] = s[1][0]; s[1][0] = t; }
     { uint8_t t0 = s[2][0], t1 = s[2][1]; s[2][0] = s[2][2]; s[2][2] = t0; s[2][1] = s[2][3]; s[2][3] = t1; }
     { uint8_t t = s[3][0]; s[3][0] = s[3][1]; s[3][1] = s[3][2]; s[3][2] = s[3][3]; s[3][3] = t; }
@@ -170,17 +169,17 @@ static void aes_decrypt_block(uint8_t block[16], const uint32_t rk[44]) {
         for (int c = 0; c < 4; c++)
             s[r][c] ^= (uint8_t)(rk[0 + c] >> (24 - r * 8));
 
-    /* 写回 block */
+    /* 鍐欏洖 block */
     for (int r = 0; r < 4; r++)
         for (int c = 0; c < 4; c++)
             block[r + 4 * c] = s[r][c];
 }
 
-/* ==================== AES-128-CBC 解密主接口 ==================== */
+/* ==================== AES-128-CBC 瑙ｅ瘑涓绘帴鍙?==================== */
 
 /*
- * 从 ota.h（已 gitignore）中获取密钥与 IV
- * ota.h 定义宏：OTA_AES_KEY_DATA 和 OTA_AES_IV_DATA
+ * 浠?ota.h锛堝凡 gitignore锛変腑鑾峰彇瀵嗛挜涓?IV
+ * ota.h 瀹氫箟瀹忥細OTA_AES_KEY_DATA 鍜?OTA_AES_IV_DATA
  */
 static const uint8_t ota_aes_key[16] = OTA_AES_KEY_DATA;
 static const uint8_t ota_aes_iv[16]  = OTA_AES_IV_DATA;
@@ -189,13 +188,13 @@ int ota_aes_cbc_decrypt(const uint8_t *in, uint8_t *out, size_t len,
                          const uint8_t key[16], const uint8_t iv[16],
                          size_t *out_len) {
     if (len == 0 || len % OTA_AES_BLOCK_SIZE != 0)
-        return -1;  /* 长度无效 */
+        return -1;  /* 闀垮害鏃犳晥 */
 
-    /* 密钥扩展 */
+    /* 瀵嗛挜鎵╁睍 */
     uint32_t rk[44];
     key_expansion(key, rk);
 
-    /* 上一块密文（初始为 IV） */
+    /* 涓婁竴鍧楀瘑鏂囷紙鍒濆涓?IV锛?*/
     uint8_t prev[OTA_AES_BLOCK_SIZE];
     memcpy(prev, iv, OTA_AES_BLOCK_SIZE);
 
@@ -206,15 +205,15 @@ int ota_aes_cbc_decrypt(const uint8_t *in, uint8_t *out, size_t len,
 
         aes_decrypt_block(block, rk);
 
-        /* CBC：解密结果与前一块密文异或 */
+        /* CBC锛氳В瀵嗙粨鏋滀笌鍓嶄竴鍧楀瘑鏂囧紓鎴?*/
         for (int j = 0; j < OTA_AES_BLOCK_SIZE; j++)
             out[i * OTA_AES_BLOCK_SIZE + j] = block[j] ^ prev[j];
 
-        /* 保存当前密文作为下一轮的 prev */
+        /* 淇濆瓨褰撳墠瀵嗘枃浣滀负涓嬩竴杞殑 prev */
         memcpy(prev, in + i * OTA_AES_BLOCK_SIZE, OTA_AES_BLOCK_SIZE);
     }
 
-    /* 去除 PKCS7 填充 */
+    /* 鍘婚櫎 PKCS7 濉厖 */
     size_t unpadded = len;
     if (len > 0) {
         uint8_t pad = out[len - 1];
@@ -232,7 +231,7 @@ int ota_aes_cbc_decrypt(const uint8_t *in, uint8_t *out, size_t len,
     return 0;
 }
 
-/* ==================== 流式解密辅助（用于 OTA 流水线） ==================== */
+/* ==================== 娴佸紡瑙ｅ瘑杈呭姪锛堢敤浜?OTA 娴佹按绾匡級 ==================== */
 
 void ota_aes_stream_init(ota_aes_stream_ctx_t *ctx,
                           const uint8_t key[16], const uint8_t iv[16]) {
@@ -252,26 +251,26 @@ int ota_aes_stream_feed(ota_aes_stream_ctx_t *ctx, const uint8_t *data, size_t l
     for (size_t i = 0; i < blocks; i++) {
         const uint8_t *cblock = data + i * 16;
 
-        /* 解密当前密文块 */
+        /* 瑙ｅ瘑褰撳墠瀵嗘枃鍧?*/
         uint8_t dec[16];
         memcpy(dec, cblock, 16);
         aes_decrypt_block(dec, ctx->rk);
 
-        /* CBC：与 prev 异或得到明文 */
+        /* CBC锛氫笌 prev 寮傛垨寰楀埌鏄庢枃 */
         uint8_t plain[16];
         for (int j = 0; j < 16; j++)
             plain[j] = dec[j] ^ ctx->prev[j];
 
-        /* 保存当前密文作为下一轮的 prev */
+        /* 淇濆瓨褰撳墠瀵嗘枃浣滀负涓嬩竴杞殑 prev */
         memcpy(ctx->prev, cblock, 16);
 
-        /* 如果已有 pend 块，它现在是安全的（非最后一块） */
+        /* 濡傛灉宸叉湁 pend 鍧楋紝瀹冪幇鍦ㄦ槸瀹夊叏鐨勶紙闈炴渶鍚庝竴鍧楋級 */
         if (ctx->have_pending) {
             write_fn((uint8_t*)ctx->pend, 16);
             sha_fn(ctx->pend, 16);
         }
 
-        /* 当前明文成为新的 pend */
+        /* 褰撳墠鏄庢枃鎴愪负鏂扮殑 pend */
         memcpy(ctx->pend, plain, 16);
         ctx->have_pending = 1;
     }
@@ -284,7 +283,7 @@ int ota_aes_stream_finish(ota_aes_stream_ctx_t *ctx, size_t *out_len,
                            ota_aes_sha_fn sha_fn) {
     if (!ctx->initialized || !ctx->have_pending) return -1;
 
-    /* 最后一块：去除 PKCS7 填充 */
+    /* 鏈€鍚庝竴鍧楋細鍘婚櫎 PKCS7 濉厖 */
     uint8_t pad_val = ctx->pend[15];
     int pad_ok = (pad_val >= 1 && pad_val <= 16);
     if (pad_ok) {
@@ -301,6 +300,7 @@ int ota_aes_stream_finish(ota_aes_stream_ctx_t *ctx, size_t *out_len,
     return 0;
 }
 
-/* 便捷函数：直接使用 ota.h 中的默认密钥 */
+/* 渚挎嵎鍑芥暟锛氱洿鎺ヤ娇鐢?ota.h 涓殑榛樿瀵嗛挜 */
 const uint8_t *ota_aes_get_key(void) { return ota_aes_key; }
 const uint8_t *ota_aes_get_iv(void)  { return ota_aes_iv; }
+

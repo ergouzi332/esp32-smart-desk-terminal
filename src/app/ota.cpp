@@ -103,8 +103,11 @@ static void ota_task(void* param) {
                 http.end();
                 vTaskDelay(pdMS_TO_TICKS(10000)); continue;
             }
+            /* 解密后去掉PKCS7填充，实际固件大小比加密大小少16字节（填充块） */
+            size_t fw_size = (size_t)(total - 16);
+
             /*===============初始化ESP32 OTA分区，分配对应大小的Flash空间，准备写入密文==============*/
-            if (!Update.begin((size_t)total)) {
+            if (!Update.begin(fw_size)) {
                 Serial.print("[OTA] 准备更新失败："); Serial.println(Update.errorString());
                 http.end();
                 vTaskDelay(pdMS_TO_TICKS(10000)); continue;
@@ -118,7 +121,8 @@ static void ota_task(void* param) {
             ota_sha256_init(&g_sha_ctx);
             g_ota_written = 0;
             /*==============OTA：流式读取、解密=================*/
-            uint8_t buf[128];//128字节临时缓冲区，每次从网络读取密文
+            uint8_t buf[144];//128+16，留出16字节缓存上次未对齐的碎片
+            size_t rem_len = 0;//未对齐碎片长度
             WiFiClient *s = http.getStreamPtr();//获取HTTP底层TCP数据流指针，用来流式读取二进制固件
             size_t total_read = 0;//累计已经处理过的密文字节总数，用来判断是否下载完整固件
 
@@ -126,12 +130,14 @@ static void ota_task(void* param) {
             while (http.connected() && total_read < (size_t)total) {
                 size_t avail = s->available();
                 if (avail == 0) { vTaskDelay(1); continue; }        //暂无数据，短暂让出CPU，不占用资源死等
-                if (avail > sizeof(buf)) avail = sizeof(buf);       //限制单次读取不超过buf容量128，防止缓冲区溢出
-                int n = s->readBytes(buf, avail);                   //从网络读取avail字节密文存入buf，返回实际读到的字节n
+                size_t can_read = sizeof(buf) - rem_len;            //buf可用空间，扣除上次遗留的碎片字节
+                if (avail > can_read) avail = can_read;
+                int n = s->readBytes(buf + rem_len, avail);         //从网络读取avail字节密文存入buf+rem_len位置
                 if (n <= 0) continue;
+                size_t total_len = rem_len + n;                     //本次有效数据=上一次剩余碎片+本次新读入
                 
                 //AES分组固定16字节，只取出当前分片里能被16整除的完整块用于解密
-                size_t aligned = ((size_t)n / 16) * 16;
+                size_t aligned = (total_len / 16) * 16;
                 if (aligned > 0) {
                     //送入流式AES解密：
                     //aes_ctx：提前初始化好的AES解密上下文
@@ -146,9 +152,10 @@ static void ota_task(void* param) {
                     }
                     total_read += aligned;
                 }
-                //剩下不足16字节的碎片密文，存入aes_ctx内部缓存，等待下一轮数据拼接凑齐16字节再解密
-                if (aligned < (size_t)n) {
-                    total_read += (n - aligned);
+                //剩下不足16字节的碎片密文，移到buf头部，等待下次拼接
+                rem_len = total_len - aligned;
+                if (rem_len > 0) {
+                    memmove(buf, buf + aligned, rem_len);
                 }
             }
             /*==============OTA：处理最后一块PKCS7填充=================*/

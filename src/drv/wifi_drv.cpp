@@ -6,7 +6,7 @@
 
 uint8_t wifi_connected = 0;
 
-// WiFi 连接状态检测，首次连上时自动校准 RTC
+/*WiFi 连接状态检测，首次连上时自动校准 RTC*/
 void wifi_task_loop(void)
 {
     static bool timeFetched = false;
@@ -14,7 +14,7 @@ void wifi_task_loop(void)
         wifi_connected = 1;
         if (!timeFetched) {
             timeFetched = true;
-            getTime(); // 首次连上 WiFi 时校准 RTC
+            getTime(); //首次连上 WiFi 时校准 RTC
         }
     } else {
         wifi_connected = 0;
